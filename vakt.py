@@ -181,6 +181,9 @@ def run():
 
     STATE.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
     log(f"OK {len(rows)} tilbud, {on} på lager, {len(failed)} kilder feilet{': ' + ', '.join(failed) if failed else ''}")
+    for s in status:
+        if not s["ok"]:
+            log(f"  feil {s['kilde']}: {s['feil']}")
 
 
 def main():
