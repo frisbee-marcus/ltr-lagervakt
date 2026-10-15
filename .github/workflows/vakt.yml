@@ -1,0 +1,64 @@
+name: LTR-lagervakt
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # GitHub kan forsinke planlagte kjøringer noen minutter ved høy last
+    - cron: "17 6 * * 1"    # ukentlig: hold planen i live (se keepalive-jobben)
+  workflow_dispatch:
+
+concurrency:
+  group: vakt
+  cancel-in-progress: false
+
+jobs:
+  vakt:
+    if: github.event.schedule != '17 6 * * 1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # tilstand.json husker hva som var på lager forrige runde, så vi bare varsler ved endring
+      - name: Hent tilstand fra forrige runde
+        uses: actions/cache/restore@v4
+        with:
+          path: tilstand.json
+          key: tilstand-${{ github.run_id }}
+          restore-keys: tilstand-
+
+      - name: Skrap og varsle
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python3 vakt.py
+
+      - name: Lagre tilstand
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: tilstand.json
+          key: tilstand-${{ github.run_id }}
+
+      - name: Resultater i jobbsammendraget
+        if: always()
+        run: |
+          python3 - >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          import json
+          d = json.load(open("resultater.json", encoding="utf-8"))
+          print(f"### Hentet {d['hentet']}\n\n| Produkt | Butikk | Pris | Lager |\n|---|---|---|---|")
+          for r in d["resultater"]:
+              print(f"| {r['produkt']} | [{r['butikk']}]({r['url']}) | {r['pris']} kr | {'✅ på lager' if r['lager'] else 'utsolgt'} |")
+          bad = [s["kilde"] for s in d["kilder"] if not s["ok"]]
+          print(f"\nKilder som feilet: {', '.join(bad) or 'ingen'}")
+          EOF
+
+  # GitHub slår av planlagte workflows i offentlige repoer etter 60 dager uten aktivitet.
+  # Å aktivere workflowen på nytt via API-et nullstiller den telleren.
+  keepalive:
+    if: github.event.schedule == '17 6 * * 1'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - run: gh workflow enable vakt.yml --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}

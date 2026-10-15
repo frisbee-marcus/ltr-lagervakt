@@ -1,0 +1,241 @@
+<title>LTR Booster-jakt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: smal arbeidsflate — sammendrag per produkt øverst, så faner med tilbudstabell, kildedekning nederst */
+:root {
+  --bg: #f2f3ef;          /* steingrå med grønt stikk */
+  --surface: #fbfbf8;
+  --ink: #1b221e;
+  --muted: #5d6862;
+  --line: #d9ddd5;
+  --gold: #8f6512;        /* Den ene ringen, brukt sparsomt */
+  --gold-soft: #f1e6cc;
+  --ok: #1f7a4a;  --ok-bg: #dcefe3;
+  --no: #9b3b2e;  --no-bg: #f3e0dc;
+  --unk: #6b6457; --unk-bg: #ebe7df;
+  --f-display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121614; --surface: #1a201d; --ink: #e5e8e2; --muted: #9aa49e; --line: #2c3430;
+  --gold: #d6ad52; --gold-soft: #3a2f17;
+  --ok: #6fd19a; --ok-bg: #173826; --no: #f09a8a; --no-bg: #3e201b; --unk: #bdb6a8; --unk-bg: #2b2925;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #121614; --surface: #1a201d; --ink: #e5e8e2; --muted: #9aa49e; --line: #2c3430;
+  --gold: #d6ad52; --gold-soft: #3a2f17;
+  --ok: #6fd19a; --ok-bg: #173826; --no: #f09a8a; --no-bg: #3e201b; --unk: #bdb6a8; --unk-bg: #2b2925;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; display: grid; gap: 28px; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+
+header { display: grid; gap: 6px; }
+.eyebrow { font: 500 12px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.setcode { color: var(--gold); border: 1px solid currentColor; border-radius: 3px; padding: 3px 6px; }
+h1 { font: 700 clamp(28px, 5vw, 40px)/1.1 var(--f-display); letter-spacing: .02em; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 65ch; }
+
+.status { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: start; padding: 14px 16px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.status .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; background: var(--unk); }
+.status.fresh .dot { background: var(--ok); box-shadow: 0 0 0 4px var(--ok-bg); }
+.status.stale .dot { background: var(--gold); box-shadow: 0 0 0 4px var(--gold-soft); }
+.st-main { display: grid; gap: 2px; min-width: 0; font-variant-numeric: tabular-nums; }
+.st-age { font: 13px/1 var(--f-mono); color: var(--muted); }
+.status.stale .st-age { color: var(--gold); }
+.st-sub { font: 13px/1.4 var(--f-mono); color: var(--muted); }
+.st-note { grid-column: 2; margin: 2px 0 0; font-size: 13px; color: var(--muted); max-width: 70ch; }
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.sum { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; display: grid; gap: 10px; min-width: 0; }
+.sum h2 { font: 600 13px/1.2 var(--f-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.sum .big { font: 500 30px/1 var(--f-mono); font-variant-numeric: tabular-nums; }
+.sum .big small { font-size: 14px; color: var(--muted); }
+.sum .verdict { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+.sum .meta { font: 13px/1.4 var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--f-body); padding: 5px 9px; border-radius: 999px; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.ok { color: var(--ok); background: var(--ok-bg); }
+.pill.no { color: var(--no); background: var(--no-bg); }
+.pill.unk { color: var(--unk); background: var(--unk-bg); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.tabs button { font: 600 14px/1 var(--f-body); color: var(--muted); background: none; border: 0; padding: 10px 16px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+.tabs button .n { font-family: var(--f-mono); font-weight: 400; opacity: .7; margin-left: 4px; }
+label.toggle { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; color: var(--muted); }
+label.toggle input { accent-color: var(--gold); width: 16px; height: 16px; }
+
+.tablebox { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; min-width: 640px; }
+th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+th { font: 600 12px/1 var(--f-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+th button { all: unset; cursor: pointer; }
+th button:focus-visible { outline: 2px solid var(--gold); }
+td.num, th.num { white-space: nowrap; text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+td.shop { font-weight: 600; }
+td.shop .t { display: block; font-weight: 400; font-size: 13px; color: var(--muted); max-width: 42ch; }
+td.src { font: 12px/1.3 var(--f-mono); color: var(--muted); }
+tr.best td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+.go { font: 600 13px/1 var(--f-body); text-decoration: none; border: 1px solid var(--line); padding: 7px 10px; border-radius: 6px; white-space: nowrap; }
+.go:hover { border-color: var(--gold); color: var(--gold); }
+.note { font: 600 11px/1 var(--f-body); color: var(--gold); background: var(--gold-soft); padding: 3px 6px; border-radius: 4px; margin-left: 6px; }
+.empty { padding: 28px 20px; text-align: center; color: var(--muted); }
+
+section h3 { font: 600 16px/1.3 var(--f-body); margin: 0 0 10px; }
+.sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 20px; font: 13px/1.5 var(--f-mono); padding: 0; margin: 0; list-style: none; }
+.sources li { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px dashed var(--line); padding: 4px 0; min-width: 0; }
+.sources li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sources .err { color: var(--no); }
+.foot { color: var(--muted); font-size: 14px; max-width: 70ch; display: grid; gap: 8px; }
+.foot code { font-family: var(--f-mono); background: var(--surface); border: 1px solid var(--line); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><span class="setcode">LTR</span><span>Universes Beyond · Set Booster</span></div>
+    <h1>Tales of Middle-earth: Set Booster-jakt</h1>
+    <p class="lede">Priser og lagerstatus fra norske nettbutikker for enkeltpakke (12 kort + kunstkort) og Set Booster Display (30 pakker + box topper). Data hentes med skrapeskriptet og vises her slik de var ved siste kjøring.</p>
+  </header>
+
+  <div class="status" id="status" aria-live="polite">
+    <span class="dot" id="st-dot"></span>
+    <div class="st-main">
+      <div><strong>Sist skrapet</strong> <span id="st-when"></span> <span class="st-age" id="st-age"></span></div>
+      <div class="st-sub" id="st-vakt"></div>
+    </div>
+    <p class="st-note">Øyeblikksbilde fra siste publisering. Vakten kjører videre på PC-en, og ntfy-appen viser siste puls (én stille melding i timen).</p>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="controls">
+    <div class="tabs" role="tablist" aria-label="Produkt">
+      <button role="tab" id="tab-display" aria-selected="true" data-kind="display">Display<span class="n" id="n-display"></span></button>
+      <button role="tab" id="tab-pakke" aria-selected="false" data-kind="pakke">Pakke<span class="n" id="n-pakke"></span></button>
+    </div>
+    <label class="toggle"><input type="checkbox" id="only-stock"> Vis bare varer på lager</label>
+  </div>
+
+  <div class="tablebox" role="tabpanel" aria-labelledby="tab-display">
+    <table>
+      <thead><tr>
+        <th>Butikk</th>
+        <th class="num"><button data-sort="pris">Pris ↕</button></th>
+        <th class="num" id="th-per">Per pakke</th>
+        <th>Lager</th>
+        <th>Kilde</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <section>
+    <h3>Kilder sjekket</h3>
+    <ul class="sources" id="sources"></ul>
+  </section>
+
+  <div class="foot">
+    <p>Ikke dekket: Outland har tatt produktene ut av sortimentet (søk i API-et deres gir ingen treff). Kortkongen.no og tcgnorge.no ble hoppet over fordi sertifikatene deres er ugyldige. Prisjakt har bare en oppføring for enkeltpakken, ikke for displayet.</p>
+    <p>Lagervakten (<code>vakt.py</code>) sjekker alle kildene hvert 5. minutt mens PC-en er på, og gir et Windows-varsel med lenke til butikken når noe kommer på lager. Denne siden viser et øyeblikksbilde og oppdateres når Claude publiserer den på nytt.</p>
+  </div>
+</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+(() => {
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const rows = data.resultater;
+  const PACKS = 30;
+  const kr = v => v == null ? '–' : v.toLocaleString('nb-NO', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 }) + ' kr';
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const pill = l => l === true ? '<span class="pill ok">På lager</span>' : l === false ? '<span class="pill no">Utsolgt</span>' : '<span class="pill unk">Ukjent</span>';
+
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  let kind = store.get('ltr-kind') || 'display';
+  let onlyStock = store.get('ltr-stock') === '1';
+  let asc = true;
+
+  // Statuslinje: tidspunkt for skrapingen i dette øyeblikksbildet, og hvor gammelt det er nå
+  const d = new Date(data.hentet);
+  document.getElementById('st-when').textContent = d.toLocaleString('nb-NO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const v = data.vakt;
+  const failedNow = data.kilder.filter(s => !s.ok).length;
+  document.getElementById('st-vakt').textContent = (v
+    ? `Vakten: ${v.runder_24t} runder siste døgn, ${v.runder_med_feil_24t} med feil · sjekker hvert ${v.intervall_min}. min`
+    : 'Manuell kjøring') + ` · ${data.kilder.length - failedNow} av ${data.kilder.length} kilder svarte`;
+  function tick() {
+    const min = Math.max(0, Math.round((Date.now() - d) / 60000));
+    const age = min < 1 ? 'akkurat nå' : min < 60 ? `for ${min} min siden`
+      : min < 1440 ? `for ${Math.floor(min / 60)} t ${min % 60} min siden` : `for ${Math.floor(min / 1440)} døgn siden`;
+    document.getElementById('st-age').textContent = `(${age})`;
+    const el = document.getElementById('status');
+    el.classList.toggle('fresh', min < 15);
+    el.classList.toggle('stale', min >= 15);
+  }
+  tick();
+  setInterval(tick, 30000);
+
+  // Sammendrag
+  const label = { display: 'Set Booster Display', pakke: 'Set Booster-pakke' };
+  document.getElementById('summary').innerHTML = ['display', 'pakke'].map(k => {
+    const all = rows.filter(r => r.produkt === k && r.pris != null);
+    const inStock = all.filter(r => r.lager === true).sort((a, b) => a.pris - b.pris);
+    const cheapest = [...all].sort((a, b) => a.pris - b.pris)[0];
+    const best = inStock[0];
+    const shops = new Set(all.map(r => r.butikk.replace(/ \(via Prisjakt\)$/, '').replace(/\.no$/i, '').toLowerCase())).size;
+    const big = best ? kr(best.pris) : 'Ingen på lager';
+    const verdict = best
+      ? `${pill(true)} <span>hos <strong>${esc(best.butikk)}</strong></span>`
+      : `${pill(false)} <span>${shops} butikker har den oppført, alle utsolgt</span>`;
+    const per = k === 'display' && cheapest ? ` · ${kr(Math.round(cheapest.pris / PACKS * 10) / 10)}/pakke` : '';
+    const meta = cheapest ? `Laveste oppførte pris: ${kr(cheapest.pris)} (${esc(cheapest.butikk)})${per}` : 'Ingen treff';
+    return `<div class="sum"><h2>${label[k]}</h2><div class="big">${big}</div><div class="verdict">${verdict}</div><div class="meta">${meta}</div></div>`;
+  }).join('');
+
+  for (const k of ['display', 'pakke']) document.getElementById('n-' + k).textContent = rows.filter(r => r.produkt === k).length;
+
+  function render() {
+    document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.kind === kind)));
+    document.querySelector('[role=tabpanel]').setAttribute('aria-labelledby', 'tab-' + kind);
+    document.getElementById('only-stock').checked = onlyStock;
+    document.getElementById('th-per').hidden = kind !== 'display';
+    let list = rows.filter(r => r.produkt === kind && (!onlyStock || r.lager === true));
+    list.sort((a, b) => (asc ? 1 : -1) * ((a.pris ?? 1e9) - (b.pris ?? 1e9)));
+    const bestIdx = list.findIndex(r => r.lager === true);
+    const tb = document.getElementById('rows');
+    if (!list.length) {
+      tb.innerHTML = `<tr><td colspan="6" class="empty">${onlyStock ? 'Ingen butikker har denne på lager akkurat nå. Slå av filteret for å se utsolgte oppføringer og sist kjente pris.' : 'Ingen treff for dette produktet.'}</td></tr>`;
+      return;
+    }
+    tb.innerHTML = list.map((r, i) => `
+      <tr class="${i === bestIdx ? 'best' : ''}">
+        <td class="shop">${esc(r.butikk)}${r.merknad ? `<span class="note">${esc(r.merknad)}</span>` : ''}<span class="t">${esc(r.tittel)}</span></td>
+        <td class="num">${kr(r.pris)}</td>
+        ${kind === 'display' ? `<td class="num">${r.pris ? kr(Math.round(r.pris / PACKS * 10) / 10) : '–'}</td>` : ''}
+        <td>${pill(r.lager)}</td>
+        <td class="src">${esc(r.kilde)}</td>
+        <td><a class="go" href="${esc(r.url)}" target="_blank" rel="noopener">Til butikk ↗</a></td>
+      </tr>`).join('');
+  }
+
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { kind = b.dataset.kind; store.set('ltr-kind', kind); render(); }));
+  document.getElementById('only-stock').addEventListener('change', e => { onlyStock = e.target.checked; store.set('ltr-stock', onlyStock ? '1' : '0'); render(); });
+  document.querySelector('[data-sort=pris]').addEventListener('click', () => { asc = !asc; render(); });
+
+  document.getElementById('sources').innerHTML = data.kilder.map(s =>
+    `<li><span title="${esc(s.kilde)}">${esc(s.kilde)}</span>${s.ok ? `<span>${s.treff} treff</span>` : `<span class="err" title="${esc(s.feil)}">feil</span>`}</li>`).join('');
+
+  render();
+})();
+</script>

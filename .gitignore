@@ -1,0 +1,9 @@
+# Lokal tilstand og hemmeligheter — ntfy-emnet ligger som repo-secret NTFY_TOPIC
+config.json
+tilstand.json
+vakt.log*
+vakt.lock
+resultater.json*
+resultater.csv
+artefakt.html
+__pycache__/
