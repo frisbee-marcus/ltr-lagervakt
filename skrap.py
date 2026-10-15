@@ -114,12 +114,18 @@ def row(shop, title, price, in_stock, url, kind=None, ean=None, kilde="", note="
 # produktsidene (1–2 forespørsler). Shopify struper hele IP-en med 429 hvis vi søker gjennom 10 butikker
 # hvert 5. minutt. Et domene som mangler her, får et fullt søk.
 KNOWN = {}
+FALLBACK = {}  # sist kjente produktsider, brukes hvis et fullt søk blir strupet
 
 
 def shopify(shop, domain):
     handles = KNOWN.get(domain)
     if handles is None:
-        handles = shopify_discover(domain)
+        try:
+            handles = shopify_discover(domain)
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or domain not in FALLBACK:
+                raise
+            handles = FALLBACK[domain]
     out = []
     for h in sorted(handles):
         try:

@@ -27,6 +27,7 @@ STATE = HERE / "tilstand.json"
 LOG = HERE / "vakt.log"
 LOCK = HERE / "vakt.lock"
 CONFIG = HERE / "config.json"
+FASIT = HERE / "shopify_fasit.json"
 REMIND_MIN = 30          # påminnelse så lenge varen fortsatt er på lager
 PULSE_MIN = 60           # stille «vakten lever»-melding i ntfy (prioritet 1: ingen lyd/banner)
 OUTAGE_RUNS = 6          # ~30 min med de fleste kilder nede -> ett varsel
@@ -108,8 +109,12 @@ def run(only=None):
     now = time.time()
     # Shopify: sjekk bare kjente produktsider, med fullt søk én gang i timen (og for butikker uten fasit)
     known = state.setdefault("shopify", {})
+    if FASIT.exists():  # startliste i repoet, for domener vakten ikke har en egen liste for ennå
+        for d, h in json.loads(FASIT.read_text(encoding="utf-8")).items():
+            known.setdefault(d, h)
     discover = not only and now - state.get("sist_oppdaget", 0) > DISCOVER_MIN * 60
     skrap.KNOWN = {} if discover else {d: set(h) for d, h in known.items()}
+    skrap.FALLBACK = {d: set(h) for d, h in known.items()}
     payload = skrap.scrape(verbose=False, only=only)
     rows, status = payload["resultater"], payload["kilder"]
     for name, domain in skrap.SHOPIFY.items():
