@@ -30,6 +30,7 @@ CONFIG = HERE / "config.json"
 REMIND_MIN = 30          # påminnelse så lenge varen fortsatt er på lager
 PULSE_MIN = 60           # stille «vakten lever»-melding i ntfy (prioritet 1: ingen lyd/banner)
 OUTAGE_RUNS = 6          # ~30 min med de fleste kilder nede -> ett varsel
+DISCOVER_MIN = 60        # fullt søk i Shopify-butikkene; ellers bare kjente produktsider
 PS_APPID = r"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"
 NAVN = {"display": "Set Booster Display", "pakke": "Set Booster-pakke"}
 
@@ -104,9 +105,19 @@ def run(only=None):
     """only = kildenavn som skal prøves på nytt (retry-jobben på en annen GitHub-server). Da hoppes
     rundetelling, puls, nedetidsvarsel og lagring av resultater over — det gjør hovedrunden."""
     state = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {"varer": {}, "nede_runder": 0}
+    now = time.time()
+    # Shopify: sjekk bare kjente produktsider, med fullt søk én gang i timen (og for butikker uten fasit)
+    known = state.setdefault("shopify", {})
+    discover = not only and now - state.get("sist_oppdaget", 0) > DISCOVER_MIN * 60
+    skrap.KNOWN = {} if discover else {d: set(h) for d, h in known.items()}
     payload = skrap.scrape(verbose=False, only=only)
     rows, status = payload["resultater"], payload["kilder"]
-    now = time.time()
+    for name, domain in skrap.SHOPIFY.items():
+        st = next((s for s in status if s["kilde"] == f"{name} ({domain})"), None)
+        if st and st["ok"] and domain not in skrap.KNOWN:  # nytt fullt søk som lyktes = ny fasit
+            known[domain] = sorted(r["url"].rsplit("/", 1)[1] for r in rows if r["butikk"] == name)
+    if discover:
+        state["sist_oppdaget"] = now
 
     failed = [s["kilde"] for s in status if not s["ok"]]
     if only:

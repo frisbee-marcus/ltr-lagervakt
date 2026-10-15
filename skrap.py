@@ -63,7 +63,8 @@ def get(url, data=None, headers=None, timeout=25):
         except urllib.error.HTTPError as e:
             if e.code not in (429, 502, 503) or attempt == 3:
                 raise
-            time.sleep(2 * (attempt + 1))
+            wait = e.headers.get("Retry-After") if e.headers else None
+            time.sleep(min(float(wait), 15) if wait and wait.isdigit() else 2 * (attempt + 1))
 
 
 def _get(url, data, headers, timeout):
@@ -109,7 +110,35 @@ def row(shop, title, price, in_stock, url, kind=None, ean=None, kilde="", note="
 
 
 # --- Adaptere --------------------------------------------------------------
+# Kjente Shopify-produkter per domene, satt av vakt.py. Et domene som står her, sjekkes bare på disse
+# produktsidene (1–2 forespørsler). Shopify struper hele IP-en med 429 hvis vi søker gjennom 10 butikker
+# hvert 5. minutt. Et domene som mangler her, får et fullt søk.
+KNOWN = {}
+
+
 def shopify(shop, domain):
+    handles = KNOWN.get(domain)
+    if handles is None:
+        handles = shopify_discover(domain)
+    out = []
+    for h in sorted(handles):
+        try:
+            p = json.loads(get(f"https://{domain}/products/{h}.js")[1])
+        except urllib.error.HTTPError as e:
+            if e.code == 404:  # produktet er slettet; alt annet (429 osv.) skal gjøre kilden «feilet»
+                continue
+            raise
+        except UnicodeError:  # videresending til en adresse med ™/® (urllib takler ikke det), aldri en av våre
+            continue
+        v = p["variants"][0]
+        r = row(shop, p["title"], p["price"] / 100, bool(p.get("available")), f"https://{domain}/products/{h}",
+                ean=(v.get("barcode") or "").strip(), kilde="Shopify")
+        if r:
+            out.append(r)
+    return out
+
+
+def shopify_discover(domain):
     # suggest.json alene bommer (maks 10 treff, draft-varer fortrenger set), så vi høster også søkesiden
     handles = set()
     for q in QUERIES:
@@ -118,6 +147,9 @@ def shopify(shop, domain):
             data = json.loads(get(f"https://{domain}/search/suggest.json?q={qq}&resources[type]=product"
                                   "&resources[limit]=10&resources[options][unavailable_products]=last")[1])
             handles |= {p["handle"] for p in data.get("resources", {}).get("results", {}).get("products", [])}
+        except urllib.error.HTTPError as e:
+            if e.code == 429:  # strupet: ufullstendig søk skal ikke lagres som fasit
+                raise
         except Exception:
             pass
         for page in (1, 2):
@@ -133,20 +165,16 @@ def shopify(shop, domain):
                     handles |= {p["handle"] for p in prods["products"]}
             if len(cols) < 250:
                 break
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            raise
     except Exception:
         pass
-    out = []
-    for h in sorted(h for h in handles if re.search(r"middle|ltr|lord-of-the-rings", h)):
-        try:
-            p = json.loads(get(f"https://{domain}/products/{h}.js")[1])
-        except Exception:
-            continue
-        v = p["variants"][0]
-        r = row(shop, p["title"], p["price"] / 100, bool(p.get("available")), f"https://{domain}/products/{h}",
-                ean=(v.get("barcode") or "").strip(), kilde="Shopify")
-        if r:
-            out.append(r)
-    return out
+    # Hent bare produktsider som ser ut som pakke/display; butikker som Pokestore har mye annet LOTR-utstyr
+    return {h for h in handles
+            if re.search(r"middle|ltr|lord-of-the-rings", h)
+            and re.search(r"booster|display|box|boks|pakke|pack", h)
+            and not re.search(r"collector|jumpstart|commander|scene|bundle|starter|gift", h)}
 
 
 def woo(shop, domain):
