@@ -93,25 +93,25 @@ def key(r):
     return f"{r['butikk']}|{r['url']}"
 
 
-def source_ok(row, status):
-    """Skjedde raden i en kilde som svarte denne runden? (Prisjakt-rader har butikknavn med suffiks.)"""
-    for s in status:
-        name = s["kilde"]
-        if row["kilde"] == "Prisjakt" and name.startswith("Prisjakt"):
-            return s["ok"]
-        if name.startswith(row["butikk"] + " "):
-            return s["ok"]
-    return True
+def belongs(butikk, kilde):
+    """Hører en rad med dette butikknavnet til denne kilden? Prisjakt-rader heter «X (via Prisjakt)»."""
+    if butikk.endswith("(via Prisjakt)"):
+        return kilde.startswith("Prisjakt")
+    return kilde.startswith(butikk + " ")
 
 
-def run():
+def run(only=None):
+    """only = kildenavn som skal prøves på nytt (retry-jobben på en annen GitHub-server). Da hoppes
+    rundetelling, puls, nedetidsvarsel og lagring av resultater over — det gjør hovedrunden."""
     state = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {"varer": {}, "nede_runder": 0}
-    payload = skrap.scrape(verbose=False)
+    payload = skrap.scrape(verbose=False, only=only)
     rows, status = payload["resultater"], payload["kilder"]
     now = time.time()
 
     failed = [s["kilde"] for s in status if not s["ok"]]
-    if len(failed) > len(status) / 2:
+    if only:
+        pass
+    elif len(failed) > len(status) / 2:
         state["nede_runder"] = state.get("nede_runder", 0) + 1
         if state["nede_runder"] == OUTAGE_RUNS:
             notify("LTR-vakt: får ikke kontakt", f"{len(failed)} av {len(status)} kilder har feilet de siste {OUTAGE_RUNS} rundene. Sjekk nettet/VPN.")
@@ -139,12 +139,13 @@ def run():
             entry.pop("paa_lager_siden", None)
         seen[k] = entry
 
-    # Rader som forsvant fra en kilde som svarte = tatt ut av sortiment; behold dem fra kilder som feilet
+    # En vare som forsvant fra en kilde som ble sjekket og svarte, er tatt ut av sortimentet.
+    # Varer fra kilder som feilet, eller som ikke var med i en retry-runde, beholder forrige status.
     present = {key(r) for r in rows}
     for k in list(seen):
         if k not in present and seen[k].get("lager") is True:
             butikk = k.split("|")[0]
-            if not any(s["kilde"].startswith(butikk + " ") and not s["ok"] for s in status):
+            if any(belongs(butikk, s["kilde"]) and s["ok"] for s in status):
                 seen[k]["lager"] = False
 
     for r, newly in alerts:
@@ -155,6 +156,16 @@ def run():
         log(f"VARSEL {head} | {r['butikk']} | {pris} | {r['url']}")
 
     on = sum(1 for r in rows if r["lager"] is True)
+    if only:
+        STATE.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
+        ok = [s["kilde"] for s in status if s["ok"]]
+        log(f"RETRY {len(ok)} av {len(status)} kilder svarte nå, {len(rows)} tilbud, {on} på lager"
+            f"{'; fortsatt feil: ' + ', '.join(failed) if failed else ''}")
+        for s in status:
+            if not s["ok"]:
+                log(f"  feil {s['kilde']}: {s['feil']}")
+        return
+
     # Rundehistorikk siste døgn, til statuslinjen på siden og pulsmeldingen
     runs = [x for x in state.get("runder", []) if now - x["t"] < 86400]
     runs.append({"t": now, "feil": len(failed)})
@@ -184,6 +195,10 @@ def run():
     for s in status:
         if not s["ok"]:
             log(f"  feil {s['kilde']}: {s['feil']}")
+    # Gi workflowen beskjed om hvilke kilder retry-jobben skal ta
+    if os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+            fh.write(f"failed={json.dumps(failed, ensure_ascii=False)}\n")
 
 
 def main():
@@ -195,9 +210,14 @@ def main():
     if LOCK.exists() and time.time() - LOCK.stat().st_mtime < 900:
         log("Hoppet over: forrige runde kjører fortsatt")
         return
+    only = None
+    if "--only" in sys.argv:
+        only = set(json.loads(sys.argv[sys.argv.index("--only") + 1]))
+        if not only:
+            return
     LOCK.write_text(str(os.getpid()))
     try:
-        run()
+        run(only)
     except Exception as e:
         log(f"FEIL i runden: {e!r}")
     finally:

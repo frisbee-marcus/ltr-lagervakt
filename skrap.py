@@ -258,13 +258,15 @@ def prisjakt(pid):
 
 
 # --- Kjøring ---------------------------------------------------------------
-def scrape(verbose=True):
-    """Kjører alle kilder og returnerer payload-dict (brukes også av vakt.py)."""
+def scrape(verbose=True, only=None):
+    """Kjører alle kilder (eller bare kildenavnene i `only`) og returnerer payload-dict (brukes også av vakt.py)."""
     jobs = {f"{n} ({d})": (shopify, n, d) for n, d in SHOPIFY.items()}
     jobs |= {f"{n} ({d})": (woo, n, d) for n, d in WOO.items()}
     jobs["Outland (outland.no)"] = (outland,)
     jobs |= {f"{n} (html)": (html_search, n, *v) for n, v in HTML_SEARCH.items()}
     jobs |= {f"Prisjakt p={p}": (prisjakt, p) for p in PRISJAKT}
+    if only:
+        jobs = {n: j for n, j in jobs.items() if n in only}
 
     results, status = [], []
     with cf.ThreadPoolExecutor(8) as ex:

@@ -15,6 +15,8 @@ jobs:
     if: github.event.schedule != '17 6 * * 1'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      failed: ${{ steps.run.outputs.failed }}
     steps:
       - uses: actions/checkout@v4
 
@@ -27,6 +29,7 @@ jobs:
           restore-keys: tilstand-
 
       - name: Skrap og varsle
+        id: run
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python3 vakt.py
@@ -50,6 +53,36 @@ jobs:
           bad = [s["kilde"] for s in d["kilder"] if not s["ok"]]
           print(f"\nKilder som feilet: {', '.join(bad) or 'ingen'}")
           EOF
+
+  # Noen butikker blokkerer enkelte av GitHub sine datasenter-IP-er. En ny jobb får en ny server
+  # (og som regel ny IP), så kildene som feilet prøves på nytt derfra med tilstanden hovedjobben lagret.
+  retry:
+    needs: vakt
+    if: needs.vakt.outputs.failed != '' && needs.vakt.outputs.failed != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hent tilstand fra hovedjobben
+        uses: actions/cache/restore@v4
+        with:
+          path: tilstand.json
+          key: tilstand-${{ github.run_id }}
+          fail-on-cache-miss: true
+
+      - name: Prøv blokkerte kilder på nytt
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          FAILED: ${{ needs.vakt.outputs.failed }}
+        run: python3 vakt.py --only "$FAILED"
+
+      - name: Lagre tilstand
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: tilstand.json
+          key: tilstand-${{ github.run_id }}-retry
 
   # GitHub slår av planlagte workflows i offentlige repoer etter 60 dager uten aktivitet.
   # Å aktivere workflowen på nytt via API-et nullstiller den telleren.
